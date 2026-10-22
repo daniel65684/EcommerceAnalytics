@@ -1,8 +1,3 @@
-// =====================================================================
-//  EcommerceAnalytics - build.sbt
-//  Projet final Spark & Scala - Groupe 3
-// =====================================================================
-
 ThisBuild / organization := "com.ecommerce"
 ThisBuild / version      := "1.0.0"
 

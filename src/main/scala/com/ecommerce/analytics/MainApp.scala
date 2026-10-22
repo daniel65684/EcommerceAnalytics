@@ -1,5 +1,7 @@
 package com.ecommerce.analytics
 
-class MainApp {
-
+object MainApp {
+  def main(args: Array[String]): Unit = {
+    println("Pipeline EcommerceAnalytics démarré")
+  }
 }
