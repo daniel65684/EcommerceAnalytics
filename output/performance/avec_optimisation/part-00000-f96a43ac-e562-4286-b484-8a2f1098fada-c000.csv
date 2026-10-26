@@ -1,0 +1,6 @@
+mode,etape,duree_s
+avec_optimisation,1. Ingestion et validation,35.07
+avec_optimisation,2. Transformation,21.19
+avec_optimisation,3. Analytique,21.89
+avec_optimisation,4. Écriture,23.3
+avec_optimisation,Total,101.44

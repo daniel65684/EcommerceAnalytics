@@ -5,6 +5,9 @@ import org.apache.spark.sql.functions.broadcast
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import org.apache.spark.storage.StorageLevel
 
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 import scala.collection.mutable
 import scala.util.control.NonFatal
 
@@ -104,14 +107,17 @@ object SparkOptimizations {
 class StageTimer {
 
   private val durations = mutable.LinkedHashMap.empty[String, Double]
+  private val clock     = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
+  /** Exécute une étape en journalisant son heure de début, de fin et sa durée (5.3 et 6.2). */
   def time[T](stage: String)(block: => T): T = {
+    println(s"\n[Étape] $stage | début : ${LocalDateTime.now().format(clock)}")
     val start = System.nanoTime()
     try block
     finally {
       val seconds = (System.nanoTime() - start) / 1e9
       durations.update(stage, seconds)
-      println(f"[Temps] $stage : $seconds%.2f s")
+      println(f"[Étape] $stage | fin : ${LocalDateTime.now().format(clock)} | durée : $seconds%.2f s")
     }
   }
 
