@@ -51,10 +51,12 @@ object DataTransformation {
       .withColumnRenamed("region", "merchant_region")
       .withColumnRenamed("establishment_date", "merchant_establishment_date")
 
+    // Question 5.2 : les trois référentiels sont petits (12 000, 6 000 et 600 lignes)
+    // face à ~138 000 transactions -> broadcast, aucune redistribution des transactions.
     val joined = transactions.toDF()
-      .join(usersDf,     Seq("user_id"),     "left")
-      .join(productsDf,  Seq("product_id"),  "left")
-      .join(merchantsDf, Seq("merchant_id"), "left")
+      .join(SparkOptimizations.broadcastIfEnabled(usersDf),     Seq("user_id"),     "left")
+      .join(SparkOptimizations.broadcastIfEnabled(productsDf),  Seq("product_id"),  "left")
+      .join(SparkOptimizations.broadcastIfEnabled(merchantsDf), Seq("merchant_id"), "left")
 
     // UDF : la struct est éclatée en 6 colonnes (hour, day_of_week, ...)
     val withTime = joined

@@ -117,7 +117,8 @@ class DataValidation(spark: SparkSession) {
     val reasons = concat_ws(" ; ", rules.map { case (violated, msg) => when(violated, lit(msg)) }: _*)
 
     // Mis en cache : réutilisé pour les valides, les rejetées et les comptages.
-    val tagged = df.withColumn("rejection_reason", when(reasons =!= "", reasons)).cache()
+    val tagged = SparkOptimizations.cacheIfEnabled(
+      df.withColumn("rejection_reason", when(reasons =!= "", reasons)), s"validation:${in.name}")
 
     val valid    = tagged.filter(col("rejection_reason").isNull).drop("rejection_reason").as[T]
     val rejected = tagged.filter(col("rejection_reason").isNotNull)
@@ -222,6 +223,6 @@ class DataValidation(spark: SparkSession) {
   /** left_anti : garde les transactions dont la clé n'a aucune correspondance. */
   private def countOrphans(tx: DataFrame, ref: DataFrame, key: String): Long =
     tx.select(key).filter(col(key).isNotNull)
-      .join(ref.select(key).distinct(), Seq(key), "left_anti")
+      .join(SparkOptimizations.broadcastIfEnabled(ref.select(key).distinct()), Seq(key), "left_anti")
       .count()
 }

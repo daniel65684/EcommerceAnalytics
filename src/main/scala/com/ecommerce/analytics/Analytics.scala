@@ -103,7 +103,7 @@ object Analytics {
         countDistinct("user_id").as("nb_utilisateurs_actifs"),
         round(sum("amount"), 2).as("ca_periode")
       )
-      .join(cohortSizes, Seq("cohort_month"))
+      .join(SparkOptimizations.broadcastIfEnabled(cohortSizes), Seq("cohort_month"))
       .withColumn("taux_retention_pct",
         round(col("nb_utilisateurs_actifs") / col("taille_cohorte") * 100, 2))
       .withColumn("revenu_moyen_par_utilisateur",
@@ -225,14 +225,19 @@ object Analytics {
       .orderBy(col("region"), col("ca_total").desc)
 
   /** Répartition du CA par méthode de paiement et période de la journée. */
-  def salesByPaymentAndPeriod(enriched: DataFrame): DataFrame =
-    enriched
+  def salesByPaymentAndPeriod(enriched: DataFrame): DataFrame = {
+    val byPaymentPeriod = enriched
       .groupBy(
         coalesce(col("payment_method"), lit("Inconnue")).as("payment_method"),
         coalesce(col("day_period"), lit("Inconnue")).as("day_period"))
       .agg(round(sum("amount"), 2).as("ca_total"), count(lit(1)).as("nb_transactions"))
-      .withColumn("pct_ca_total", round(col("ca_total") / sum("ca_total").over() * 100, 2))
+    // Total calculé à part (1 ligne) : évite une fenêtre globale sans partition
+    val total = byPaymentPeriod.agg(sum("ca_total").as("ca_global"))
+    byPaymentPeriod.crossJoin(total)
+      .withColumn("pct_ca_total", round(col("ca_total") / col("ca_global") * 100, 2))
+      .drop("ca_global")
       .orderBy(col("ca_total").desc)
+  }
 
   // ===================================================================
   // Écriture des résultats (CSV + Parquet)

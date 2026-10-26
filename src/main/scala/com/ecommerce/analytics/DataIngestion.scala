@@ -147,7 +147,8 @@ class DataIngestion(spark: SparkSession) {
    */
   def load[T](name: String, path: String)(read: => Dataset[T]): Option[LoadedDataset[T]] =
     try {
-      val ds = read
+      // En cache : le fichier est lu une fois pour le count, puis réutilisé par la validation
+      val ds = SparkOptimizations.cacheIfEnabled(read, s"source:$name")
       val n  = ds.count()
       println(f"[Ingestion] $name%-12s : $n%,d lignes lues avant validation ($path)")
       Some(LoadedDataset(name, ds, n))
