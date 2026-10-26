@@ -1,0 +1,5 @@
+dataset,nb_lignes_lues,nb_lignes_valides,nb_lignes_rejetees,taux_rejet,nb_valeurs_nulles,nb_user_id_orphelins,nb_product_id_orphelins,nb_merchant_id_orphelins
+transactions,138047,136157,1890,1.37,940,395,296,247
+users,12000,11655,345,2.88,160,,,
+products,6000,5821,179,2.98,55,,,
+merchants,600,586,14,2.33,9,,,
