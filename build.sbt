@@ -57,7 +57,8 @@ lazy val root = (project in file("."))
       "--add-opens=java.base/java.util=ALL-UNNAMED",
       "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED",
       "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-      "--add-opens=java.base/sun.security.action=ALL-UNNAMED"
+      "--add-opens=java.base/sun.security.action=ALL-UNNAMED",
+      "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED"
     ),
 
     // Le répertoire courant de `sbt run` reste la racine du projet,
