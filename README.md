@@ -359,21 +359,3 @@ sbt run
 # Sans optimisation
 sbt 'set javaOptions += "-Dapp.optimization.enabled=false"' run
 ```
-
-Les durées de chaque étape sont affichées en fin d'exécution et enregistrées dans `output/performance/<mode>/`.
-
-**Protocole :** chaque mode est exécuté 3 fois sur la même machine, en alternant les modes ; on retient la médiane. La première exécution après le démarrage du poste est écartée (chargement des fichiers par le système, compilation à la volée de la JVM).
-
-Machine de test : `<processeur, nombre de cœurs, mémoire>` — `spark.sql.shuffle.partitions = 8` — mode `local[*]`.
-
-| Étape | Sans optimisation (s) | Avec optimisation (s) | Gain (%) |
-|-------|----------------------:|----------------------:|---------:|
-| 1. Ingestion et validation | … | … | … |
-| 2. Transformation          | … | … | … |
-| 3. Analytique              | … | … | … |
-| 4. Écriture                | … | … | … |
-| **Total**                  | … | … | … |
-
-Gain (%) = (durée sans − durée avec) / durée sans × 100.
-
-**Analyse :** *(à compléter après les mesures : quelles étapes gagnent le plus et pourquoi ; une étape peut être légèrement plus lente avec optimisation, car le remplissage du cache a un coût qui n'est amorti que par les réutilisations suivantes.)*
