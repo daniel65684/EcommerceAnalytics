@@ -140,27 +140,3 @@ L'object s'appelle `MainApp` (et non `EcommerceAnalyticsApp`) pour respecter l'a
 Les chemins pointent vers `src/main/resources/data/` (et non `data/` comme dans l'exemple du sujet), car l'arborescence imposée y place les données ; Spark ne pouvant pas lire un fichier situé dans le JAR, les chemins sont relatifs à la racine du projet. Chaque lecture a une valeur par défaut, utilisée si la clé est absente ou invalide, avec un avertissement. Les définitions imposées par le sujet (tranches d'âge, périodes de la journée) restent dans le code.
 
 ---
-
-## 4. Journal des relectures croisées
-
-| Date | Module relu | Auteur | Relecteur | Remarques formulées | Suite donnée |
-|------|-------------|--------|-----------|---------------------|--------------|
-| `<AAAA-MM-JJ>` | Partie 1 – build.sbt, structure | Membre A | Membre C | `<remarques>` | `<corrigé / justifié>` |
-| `<AAAA-MM-JJ>` | Partie 2 – DataIngestion, DataValidation | Membre A | Membre B | `<remarques>` | `<...>` |
-| `<AAAA-MM-JJ>` | Partie 3 – TimeFeatures, DataTransformation | Membre B | Membre A | `<remarques>` | `<...>` |
-| `<AAAA-MM-JJ>` | Partie 4 – Analytics | Membre C | Membre B | `<remarques>` | `<...>` |
-| `<AAAA-MM-JJ>` | Partie 5 – SparkOptimizations | Membre C | Membres A et B | `<remarques>` | `<...>` |
-| `<AAAA-MM-JJ>` | Partie 6 – MainApp | Membre C | Membres A et B | `<remarques>` | `<...>` |
-| `<AAAA-MM-JJ>` | Partie 7 – application.conf, ConfigLoader | Membre A | Membre C | `<remarques>` | `<...>` |
-
----
-
-## 5. Historique Git
-
-Nombre de commits par membre, relevé avec `git shortlog -sn` avant l'envoi de l'archive (minimum 4 par membre) :
-
-| Membre | Nom Git | Nombre de commits |
-|--------|---------|-------------------|
-| Membre A | `<nom>` | `<n>` |
-| Membre B | `<nom>` | `<n>` |
-| Membre C | `<nom>` | `<n>` |
