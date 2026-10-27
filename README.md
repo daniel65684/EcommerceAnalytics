@@ -206,6 +206,8 @@ sbt "run analytics"
 sbt "run all"
 ```
 
+En mode modulaire, chaque étape enregistre ses résultats dans `output/intermediate/` (Parquet) pour l'étape suivante : `ingestion` doit donc être lancée au moins une fois avant `transformation`, et `transformation` avant `analytics`. Ensuite, chaque membre peut relancer uniquement son étape. Un argument inconnu (ou `help`) affiche la liste des valeurs acceptées.
+
 **Utiliser un autre fichier de configuration** sans modifier le projet :
 
 ```bash
@@ -308,13 +310,21 @@ En mode `client`, le driver tourne sur la machine qui lance la commande : `clust
 
 Les résultats sont écrits dans le répertoire défini par `app.data.output.path` (par défaut `output/`) :
 
-| Sous-dossier            | Contenu                                                    | Formats       |
-|-------------------------|------------------------------------------------------------|---------------|
-| `data_quality_report/`  | Rapport de qualité : lignes lues, valides, rejetées, taux de rejet, valeurs nulles | CSV |
-| `rejected/`             | Lignes rejetées par dataset, avec la colonne `rejection_reason` | CSV, Parquet |
-| `merchant_kpis/`        | KPI par marchand (CA, transactions, clients, classements, commission) | CSV, Parquet |
-| `cohort_retention/`     | Matrice de rétention par cohorte et par période            | CSV, Parquet |
-| `enriched_transactions/`| Transactions enrichies (jointures, variables temporelles, fenêtres) | Parquet |
+| Sous-dossier | Contenu | Question | Formats |
+|--------------|---------|----------|---------|
+| `data_quality_report/` | Rapport de qualité : lignes lues, valides, rejetées, taux de rejet, valeurs nulles, références orphelines | 2.4, 2.5 | CSV |
+| `rejected/<dataset>/` | Lignes rejetées avec la colonne `rejection_reason` | 2.2 | CSV, Parquet |
+| `enriched_transactions/` | Transactions enrichies (jointures, variables temporelles, fenêtres, suspicion) ; relues par l'étape `analytics` | 3.2 à 3.4 | Parquet |
+| `merchant_kpis/` | KPI par marchand (CA, transactions, clients, classements, commission, répartition par âge, taux de suspectes) | 4.1 | CSV, Parquet |
+| `cohort_retention/` | Matrice de rétention par cohorte et par période, CA et revenu moyen | 4.2 | CSV, Parquet |
+| `rfm_segmentation/` | Scores R, F, M et segment par utilisateur | 4.3 | CSV, Parquet |
+| `rfm_vs_customer_segment/` | Tableau croisé segment RFM × segment déclaré | 4.3 | CSV, Parquet |
+| `top_products/` | Top 10 des produits par CA | 4.4 | CSV, Parquet |
+| `sales_by_category_region/` | CA par catégorie et région, part dans la région | 4.4 | CSV, Parquet |
+| `sales_by_payment_period/` | CA par méthode de paiement et période de la journée | 4.4 | CSV, Parquet |
+| `performance/<mode>/` | Durée de chaque étape, avec et sans optimisation | 5.3 | CSV |
+
+Les résultats en CSV sont regroupés en un seul fichier (`part-00000-….csv`) pour être ouverts directement dans un tableur.
 
 Lecture rapide d'un résultat Parquet dans `spark-shell` :
 

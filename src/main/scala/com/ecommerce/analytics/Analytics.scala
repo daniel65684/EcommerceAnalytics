@@ -16,6 +16,11 @@ import scala.util.control.NonFatal
  */
 object Analytics {
 
+  // Paramètres d'analyse lus dans application.conf (section app.analytics)
+  val retentionPeriodMonths: Int = ConfigLoader.getInt("app.analytics.retention-period-months", 3)
+  private val rfmQuantiles       = ConfigLoader.getInt("app.analytics.rfm-quantiles", 5)
+  private val topProductsCount   = ConfigLoader.getInt("app.analytics.top-products", 10)
+
   /** Tranches d'âge de la Partie 3 -> suffixe de colonne sans espace ni accent. */
   private val AgeGroups: Seq[(String, String)] = Seq(
     "Jeune"     -> "jeune",
@@ -118,7 +123,7 @@ object Analytics {
    * Cohorte ayant la meilleure rétention à `period` mois.
    * En cas d'égalité, la cohorte la plus grande l'emporte (plus significative).
    */
-  def bestCohortAt(matrix: DataFrame, period: Int = 3): Option[Row] =
+  def bestCohortAt(matrix: DataFrame, period: Int = retentionPeriodMonths): Option[Row] =
     matrix.filter(col("period_index") === period)
       .orderBy(col("taux_retention_pct").desc, col("taille_cohorte").desc)
       .limit(1)
@@ -161,9 +166,9 @@ object Analytics {
     ).withColumn("recence_jours", datediff(lit(referenceDate), col("derniere_transaction")))
 
     perUser
-      .withColumn("score_r", ntile(5).over(Window.orderBy(col("recence_jours").desc)))
-      .withColumn("score_f", ntile(5).over(Window.orderBy(col("frequence").asc)))
-      .withColumn("score_m", ntile(5).over(Window.orderBy(col("montant").asc)))
+      .withColumn("score_r", ntile(rfmQuantiles).over(Window.orderBy(col("recence_jours").desc)))
+      .withColumn("score_f", ntile(rfmQuantiles).over(Window.orderBy(col("frequence").asc)))
+      .withColumn("score_m", ntile(rfmQuantiles).over(Window.orderBy(col("montant").asc)))
       .withColumn("score_rfm", concat(col("score_r").cast("string"), col("score_f").cast("string"), col("score_m").cast("string")))
       .withColumn("segment_rfm", rfmSegment(col("score_r"), col("score_f"), col("score_m")))
   }
@@ -198,7 +203,7 @@ object Analytics {
   // ===================================================================
 
   /** Top N des produits par CA, avec note moyenne et niveau de stock. */
-  def topProducts(enriched: DataFrame, n: Int = 10): DataFrame =
+  def topProducts(enriched: DataFrame, n: Int = topProductsCount): DataFrame =
     enriched.filter(col("product_id").isNotNull)
       .groupBy("product_id", "product_name", "product_category")
       .agg(
@@ -249,20 +254,36 @@ object Analytics {
    * et les tableaux sont convertis en texte pour le CSV.
    */
   def save(df: DataFrame, name: String): Unit = {
-    val root  = ConfigLoader.getString("app.data.output.path", "output/").stripSuffix("/")
-    val clean = df.columns.foldLeft(df) { (acc, c) =>
-      val safe = c.replaceAll("[ ,;{}()\\n\\t=]", "_")
-      if (safe == c) acc else acc.withColumnRenamed(c, safe)
-    }
+    val clean = sanitizeColumnNames(df)
     try {
-      clean.write.mode("overwrite").parquet(s"$root/$name/parquet")
+      clean.write.mode("overwrite").parquet(s"${outputPath(name)}/parquet")
       toCsvFriendly(clean).coalesce(1)
-        .write.mode("overwrite").option("header", "true").csv(s"$root/$name/csv")
-      println(s"[Écriture] $name -> $root/$name (parquet + csv)")
+        .write.mode("overwrite").option("header", "true").csv(s"${outputPath(name)}/csv")
+      println(s"[Écriture] $name -> ${outputPath(name)} (parquet + csv)")
     } catch {
       case NonFatal(e) => System.err.println(s"[Écriture] ERREUR pour $name : ${e.getMessage}")
     }
   }
+
+  /** Parquet seul : pour les gros volumes (transactions enrichies) relus par Spark. */
+  def saveParquet(df: DataFrame, name: String): Unit =
+    try {
+      sanitizeColumnNames(df).write.mode("overwrite").parquet(outputPath(name))
+      println(s"[Écriture] $name -> ${outputPath(name)} (parquet)")
+    } catch {
+      case NonFatal(e) => System.err.println(s"[Écriture] ERREUR pour $name : ${e.getMessage}")
+    }
+
+  /** <app.data.output.path>/<name> */
+  def outputPath(name: String): String =
+    s"${ConfigLoader.getString("app.data.output.path", "output/").stripSuffix("/")}/$name"
+
+  /** Parquet refuse certains caractères dans les noms de colonnes (espace, virgule...). */
+  private def sanitizeColumnNames(df: DataFrame): DataFrame =
+    df.columns.foldLeft(df) { (acc, c) =>
+      val safe = c.replaceAll("[ ,;{}()\\n\\t=]", "_")
+      if (safe == c) acc else acc.withColumnRenamed(c, safe)
+    }
 
   private def toCsvFriendly(df: DataFrame): DataFrame =
     df.select(df.schema.fields.toSeq.map { f =>

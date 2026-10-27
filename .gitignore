@@ -45,3 +45,7 @@ build/
 
 ### Scala ###
 .bsp/local.sbt
+
+output/
+.bsp/
+.idea/

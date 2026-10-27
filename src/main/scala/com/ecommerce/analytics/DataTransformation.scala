@@ -1,6 +1,7 @@
 package com.ecommerce.analytics
 
 import com.ecommerce.models.{Merchant, Product, Transaction, User}
+import com.ecommerce.utils.ConfigLoader
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Dataset}
@@ -12,6 +13,14 @@ import org.apache.spark.sql.{DataFrame, Dataset}
 object DataTransformation {
 
   private val SecondsPerDay = 86400L
+
+  // Règles métier lues dans application.conf (section app.rules), avec valeurs par défaut
+  private val windowDays        = ConfigLoader.getInt("app.rules.window-days", 7)
+  private val activeUserMinDays = ConfigLoader.getInt("app.rules.active-user-min-days", 5)
+  private val suspiciousPct     = ConfigLoader.getDouble("app.rules.suspicious.amount-over-average-pct", 300.0)
+  private val suspiciousDelay   = ConfigLoader.getLong("app.rules.suspicious.max-delay-seconds", 300L)
+  private val suspiciousPayment = ConfigLoader.getString("app.rules.suspicious.payment-method", "CRYPTO")
+  private val suspiciousSignals = ConfigLoader.getInt("app.rules.suspicious.min-signals", 2)
 
   // ===================================================================
   // Question 3.2 - enrichTransactionData
@@ -112,12 +121,12 @@ object DataTransformation {
     // ]t - 7 jours ; t] : 7 jours glissants exacts jusqu'à la transaction
     val last7DaysSeconds = Window.partitionBy("user_id")
       .orderBy(col("ts_seconds"))
-      .rangeBetween(-(7 * SecondsPerDay) + 1, Window.currentRow)
+      .rangeBetween(-(windowDays * SecondsPerDay) + 1, Window.currentRow)
 
     // Jour courant + 6 jours précédents : 7 jours calendaires
     val last7CalendarDays = Window.partitionBy("user_id")
       .orderBy(col("day_index"))
-      .rangeBetween(-6, Window.currentRow)
+      .rangeBetween(-(windowDays - 1).toLong, Window.currentRow)
 
     val byUserOrdered = Window.partitionBy("user_id").orderBy(col("ts_seconds"), col("transaction_id"))
 
@@ -125,7 +134,7 @@ object DataTransformation {
       .withColumn("montant_cumule_7j", round(sum(col("amount")).over(last7DaysSeconds), 2))
       // countDistinct n'est pas autorisé sur une fenêtre : size(collect_set) le remplace
       .withColumn("nb_jours_actifs_7j", size(collect_set(col("transaction_date")).over(last7CalendarDays)))
-      .withColumn("is_active_user", when(col("nb_jours_actifs_7j") >= 5, 1).otherwise(0))
+      .withColumn("is_active_user", when(col("nb_jours_actifs_7j") >= activeUserMinDays, 1).otherwise(0))
       .withColumn("secondes_depuis_achat_precedent",
         col("ts_seconds") - lag(col("ts_seconds"), 1).over(byUserOrdered))
       .withColumn("jours_depuis_achat_precedent",
@@ -152,16 +161,16 @@ object DataTransformation {
         round((col("amount") - col("panier_moyen_utilisateur")) / col("panier_moyen_utilisateur") * 100, 2))
 
     val conditions = Seq(
-      col("ecart_panier_moyen_pct") > 300,
+      col("ecart_panier_moyen_pct") > suspiciousPct,
       col("day_period") === "Night",
-      col("secondes_depuis_achat_precedent") < 5 * 60,
-      upper(trim(col("payment_method"))) === "CRYPTO"
+      col("secondes_depuis_achat_precedent") < suspiciousDelay,
+      upper(trim(col("payment_method"))) === suspiciousPayment.toUpperCase
     )
     val nbConditions = conditions.map(c => when(c, 1).otherwise(0)).reduce(_ + _)
 
     withGap
       .withColumn("nb_signaux_suspicion", nbConditions)
-      .withColumn("is_suspicious", when(col("nb_signaux_suspicion") >= 2, 1).otherwise(0))
+      .withColumn("is_suspicious", when(col("nb_signaux_suspicion") >= suspiciousSignals, 1).otherwise(0))
   }
 
   /** Affiche le nombre de transactions suspectes et les 20 montants les plus élevés. */
